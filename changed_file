@@ -1,0 +1,783 @@
+from flask import Flask, request, redirect
+from flask_ngrok import run_with_ngrok
+from pickle import loads, dumps
+import json
+import os
+import datetime
+from random import shuffle
+from flask_login import LoginManager, login_required, current_user, login_user
+
+
+app = Flask(__name__)
+run_with_ngrok(app)
+app.config['SECRET_KEY'] = 'secret_key'
+
+login_manager = LoginManager()
+login_manager.init_app(app)
+
+
+class User():
+    def __init__(self, email, name, password, age, sex):
+        print('#' * 100, email, name, password, age, sex)
+        self.email = email
+        self.name = name
+        self.password = password
+        self.age = age
+        self.sex = sex
+        self.visits = '0'
+        self.questions = '0'
+        self.answers = '0'
+        f = open('planetsavers_accounts.json', 'r', encoding="utf8")
+        f1 = f.read()
+        jr = json.loads(f1)
+        f.close()
+        jr[email]['password'] = password
+        jr[email]['age'] = age
+        jr[email]['sex'] = sex
+        jr[email]['visits'] = '0'
+        jr[email]['questions'] = '0'
+        jr[email]['answers'] = '0'
+        with open('planetsavers_accounts.json', 'w', encoding="utf8") as write_file:
+            json.dump(jr, write_file)
+
+    def is_bday(self):
+        now = str(datetime.datetime.now())
+        now = now.split(' ')[0]
+        if self.age.split('-')[1:] == str(now).split('-')[1:]:
+            text1 = 'Дорогой '
+            if self.sex == 'Женский':
+                text1 = 'Дорогая '
+            text1 += self.name + '!'
+            return text1
+        return False
+    
+    def is_active(self):
+        return True
+    
+    def get_id(self):
+        return self.email
+    
+    def is_authenticated(self):
+        return True
+
+
+f = open('planetsavers_accounts.json', 'r', encoding="utf8")
+f1 = f.read()
+jr = json.loads(f1)
+f.close()
+if jr == {}:
+    jr = {"borisovamailme@yandex.ru": {
+        "name": "Администратор",
+        "password": "admin",
+        'age': "2004-11-12",
+        "sex": "Женский",
+        "visits": "0",
+        "questions": "0",
+        "answers": "0"}
+    }
+    with open('planetsavers_accounts.json', 'w', encoding="utf8") as write_file:
+        json.dump(jr, write_file)
+
+
+def nav(ind, body):
+    global current
+    if current_user.is_authenticated is False:
+        btn1 = 'войти'
+    else:
+        btn1 = current_user.name
+    pars = []
+    for i in range(4):
+        if i == ind:
+            pars.append('')
+        else:
+            pars.append('-outline')
+    bday = ''
+    if current_user.is_authenticated:
+        if current_user.is_bday():
+            bday = f'''        <li class="nav-item active">
+            <a href="/musor.net/birthday/{current_user.is_bday()}"><img src="https://www.clipartmax.com/png/full/130-1306796_balloon-clipart-nine-balloons-and-confetti-clipart.png" alt="С днем рожденья!" id="img0"></a>
+          </li>'''
+    a = f'''
+    <!DOCTYPE html>
+    <head>
+        <meta charset="utf-8" />
+        <title>musor.net</title>
+        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+        <link href="https://fonts.googleapis.com/css?family=Lexend+Deca&display=swap" rel="stylesheet">
+        <link rel="stylesheet" type="text/css" href="/static/style.css" />
+    </head>
+    <body>
+
+<nav class="navbar navbar-expand-lg navbar-light bg-light">
+  <a class="navbar-brand" id="logo"><img src="https://www.freepngimg.com/thumb/plant/72740-landfill-recycle-symbol-recycling-download-hq-png.png" alt="картинка" id="img_small"> Мусор.нет</a>
+  <button class="navbar-toggler" type="button btn btn-outline-success" data-toggle="collapse" data-target="#navbarTogglerDemo02" aria-controls="navbarTogglerDemo02" aria-expanded="false" aria-label="Toggle navigation">
+    <span class="navbar-toggler-icon"></span>
+  </button>
+
+  <div class="collapse navbar-collapse" id="navbarTogglerDemo02">
+    <ul class="navbar-nav mr-auto mt-2 mt-lg-0">
+      <li class="nav-item active">
+        <a href="/musor.net"><button type="button" class="btn btn{pars[0]}-success">главная</button></a>
+      </li>
+      <li class="nav-item">
+        <div class="btn-group">
+        <button type="button" class="btn btn{pars[1]}-success dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">типы мусора</button>
+        <div class="dropdown-menu">
+          <a class="dropdown-item" href="/musor.net/plastic">пластик</a>
+          <a class="dropdown-item" href="/musor.net/paper">бумага</a>
+          <a class="dropdown-item" href="/musor.net/metal">металл</a>
+          <a class="dropdown-item" href="/musor.net/else">другое</a>
+        </div>
+      </li>
+      <li class="nav-item active">
+        <a href="/musor.net/chat"><button type="button" class="btn btn{pars[2]}-success">Вопросы и ответы</button></a>
+      </li>
+      <li class="nav-item active">
+        <a href="/musor.net/why"><button type="button" class="btn btn{pars[3]}-success" >Зачем сортировать мусор</button></a>
+      </li>
+      {bday}
+    </ul>
+  <div>
+    
+  </div>
+    <a href="/musor.net/login"><button type="button" class="btn btn-success">{btn1}</button></a>
+  </div>
+</nav>
+
+    {body}
+    
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+    </body>
+</html>'''
+    return a
+
+
+@app.route('/')
+@app.route('/musor.net')
+def main():
+    a = '''        <div class="h-100"></div>
+                <div class="char col-12 row justify-content-center">
+                    <p id="p1">Каждый год на земле вывозится более 1 млрд тонн бытовых отходов. Вот сколько мусора в мире загрязняет нашу планету. Нужны специальные площади под мусорные свалки, перерабатывающие заводы, создание новых технологий для утилизации. Но нужны и люди, готовые потратить немного времени на спасение нашей планеты! Каждый человек может сделать доброе дело! Начни помогать окружающей среде! Разделяй мусор и сдавай на переработку, собирай мукулатуру, используй пакеты несколько раз. Любое усилие считается!</p>
+                </div>
+                <div class="h-300"></div>
+                <div class="char col-12 row justify-content-center">
+                    <img src="https://clip.cookdiary.net/sites/default/files/wallpaper/recycle-clipart/172775/recycle-clipart-household-recycling-172775-5093526.png" id="img1">
+                </div>
+                <div class="h-300"></div>
+                <div class="char col-12 row justify-content-center">
+                    <a href="https://recyclemap.ru/" data-toggle="tooltip" data-html="true" title="Tooltip"><img src="https://минздрав.тверскаяобласть.рф/upload/iblock/225/рециклинг.jpeg" id="img_small"></a>
+                    <a href="https://recyclemap.ru/"><h4 id="logo">Показать карту сбора раздельного мусора</h4></a>
+                </div>
+                <div class="h-300"></div>
+                <div class="char col-12 row justify-content-center">
+                    <a href="/musor.net/mail"><button type="button" class="btn btn-light" data-toggle="tooltip" data-html="true" title="Написать нам"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/10/Pencil_green_icon.svg/600px-Pencil_green_icon.svg.png" alt="Написать нам" id="img0"></button></a>
+                </div>
+                <div class="h-300"></div>
+                <div class="char col-12 row justify-content-center"><a href="/musor.net/anketa"><button type="button" class="btn btn-outline-success" data-toggle="tooltip" data-html="true" title="(Вы нам очень поможете, если сделаете это)">Пройти опрос</button></a></div>
+        </div>
+
+    '''
+    return nav(0, a)
+
+
+@login_manager.user_loader
+def load_user(user):
+    return User
+
+
+@app.route('/musor.net/logout')
+def logout():
+    logout_user()
+    return redirect("/musor.net")
+
+
+@app.route('/musor.net/birthday/<name>')
+def birthday(name):
+    wish = 'Желаем Вам '
+    wishes = ['здоровья', 'счастья', 'прекрасных сюрпризов', 'чудес', 'много денег', 'кучу подарков', 'побольше солнечных деньков', 'удачи', 'встретить много чудесных людей', 'получить все что хочется', 'любви', 'ярких воспоминаний', 'удивительных приключений', 'хороших друзей']
+    shuffle(wishes)
+    wishes = wishes[:6]
+    wish += ',<br>'.join(wishes) + "!"
+    a = f'''        <div class="h-100"></div>
+                <div class="char col-12 row justify-content-center">
+                    <i><h2>{name}</h2>
+                    <div></div>
+                    <h3>{wish}</h3></i>
+                </div>
+                <div class="h-300"></div>
+                <div class="char col-12 row justify-content-center">
+                    <img src="https://www.beesona.ru/upload/325/3812f31561f83447e9d9191dd470f0e0.gif" id="img1">
+                </div>
+                
+
+    '''
+    return nav(-1, a)
+
+
+@app.route('/musor.net/anketa', methods=['POST', 'GET'])
+def anketa():
+    questions = [['Собираете ли вы мукулатуру?', 3], ['Собираете ли вы раздельно мусор?', 3], ['Есть ли рядом с вашим домом место для сбора раздельного мусора?', 2], ['Полезен ли вам наш сайт?', 3]]
+    if request.method == 'GET':
+        a = '''
+  <h1>Анкета</h1>
+      <div>
+          <form class="login_form" method="post">
+              <label for="form-check">Спасибо за участие в нашем опросе! Эти данные будут использованы исключительно в научных целях. Пожалуйста отвечайте честно.</label>
+              <input type="text" class="form-control" id="name" aria-describedby="emailHelp" placeholder="Введите ваш возвраст" name="age">
+              <div class="form-group">
+                  <label for="form-check">Укажите пол</label>
+                  <div class="form-check">
+                    <input class="form-check-input" type="radio" name="sex" id="male" value="Мужской" checked>
+                    <label class="form-check-label" for="Мужской">
+                      Мужской
+                    </label>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input" type="radio" name="sex" id="female" value="Женский">
+                    <label class="form-check-label" for="Женский">
+                      Женский
+                    </label>
+                  </div>
+              </div>'''
+        for i in questions:
+            a += f'''              <div class="form-group">
+                  <label for="form-check">{i[0]}</label>
+                  <div class="form-check">
+                    <input class="form-check-input" type="radio" name="ans{questions.index(i) + 1}" value="Да">
+                    <label class="form-check-label">Да</label>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input" type="radio" name="ans{questions.index(i) + 1}" value="Нет">
+                    <label class="form-check-label">Нет</label>
+                  </div>'''
+            if i[1] > 2:
+                a += f'''                  <div class="form-check">
+                    <input class="form-check-input" type="radio" name="ans{questions.index(i) + 1}" value="Иногда">
+                    <label class="form-check-label">Иногда</label>
+                  </div>'''
+        a += '''
+              <a href="/musor.net"><button type="submit" class="btn btn-outline-success">OK</button></a>
+          </form>
+      </div>
+    '''
+        return nav(-1, a)
+    elif request.method == 'POST':
+        f = open('planetsavers_anketa.json', 'r', encoding="utf8")
+        f1 = f.read()
+        jr = json.loads(f1)
+        f.close()
+        for i in questions:
+            q = i[0]
+            ind = questions.index(i)
+            if q not in jr:
+                jr[q] = []
+            jr[q].append([request.form['ans' + str(ind + 1)], request.form['age'], request.form['sex'][0]])
+        with open('planetsavers_anketa.json', 'w', encoding="utf8") as write_file:
+            json.dump(jr, write_file)
+        return main()
+
+
+@app.route('/musor.net/anketa_see')
+def check_anketa():
+    global current
+    if current_user.email != 'borisovamailme@yandex.ru':
+        f = open('planetsavers_anketa.json', 'r', encoding="utf8")
+        f1 = f.read()
+        jr = json.loads(f1)
+        f.close()
+        lst = []
+        for i in jr:
+            s = i + '\n'
+            for j in jr[i]:
+                s += ', '.join(j) + '; '
+            lst.append(s)
+        a = f'''        <div class="h-100"></div>
+            <div>{'<br>'.join(lst)}</div>
+        '''
+        return nav(-1, a)
+    return main()
+
+
+@app.route('/musor.net/visits')
+def check_visitors():
+    global current
+    if current_user.email == 'borisovamailme@yandex.ru':
+        f = open('planetsavers_accounts.json', 'r', encoding="utf8")
+        f1 = f.read()
+        jr = json.loads(f1)
+        f.close()
+        lst = []
+        for i in jr:
+            s = i + ':     '
+            s += jr[i]["name"] + ' * '
+            s += jr[i]["password"] + ' * '
+            s += jr[i]['age'] + ' * '
+            s += jr[i]["sex"] + ' * '
+            s += 'visits: ' + jr[i]["visits"] + ' * '
+            s += 'questions: ' + jr[i]["questions"] + ' * answers:' + jr[i]["answers"]
+            lst.append(s)
+        a = f'''        <div class="h-100"></div>
+            <div>{'<br>'.join(lst)}</div>
+        '''
+        return nav(-1, a)
+    return main()
+
+
+def wrong(er, form):
+    global current
+    if current_user.is_authenticated:
+        logout_user()
+    btnname = 'Попробовать снова'
+    hr = '/musor.net/createaccount'
+    if form == 'form1':
+        btnname = 'Войти'
+        hr = '/musor.net/login'
+    a = f'''
+        <!DOCTYPE html>
+        <head>
+            <meta charset="utf-8" />
+            <title>musor.net</title>
+            <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+            <link href="https://fonts.googleapis.com/css?family=Lexend+Deca&display=swap" rel="stylesheet">
+            <link rel="stylesheet" type="text/css" href="/style_planetsavers.css" />
+        </head>
+        <body>
+      <h1>{er}</h1>
+      </div>
+        <a href={hr}><button type="button" class="btn btn-success">{btnname}</button></a>
+      </div>
+        
+        <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
+        <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGz    IxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+        </body>
+    </html>'''
+    return a
+
+
+@app.route('/musor.net/portfolio/<email>')
+def portfolio(email, methods=['POST', 'GET']):
+    global current
+    f = open('planetsavers_accounts.json', 'r', encoding="utf8")
+    f1 = f.read()
+    jr = json.loads(f1)
+    f.close()
+    name = jr[email]['name']
+    password = jr[email]['password']
+    age = jr[email]['age']
+    sex = jr[email]['sex']
+    quest = jr[email]['questions']
+    ans = jr[email]['answers']
+    if request.method == 'GET':
+        a = f'''         <h1>{current[1]}</h1>
+              <div>
+                  <form class="login_form" method="post">'''
+        if current[0] == email:
+            a += f'''                      <div>email: {email}</div>
+                  <div>пароль: {password}</div>'''
+        a += f'''                  <div>дата рождения: {age}</div>
+                      <div>пол: {sex}</div>
+                      <div>количество вопросов: {quest}</div>
+                      <div>количество ответов: {ans}</div>'''
+        if current[0] == email:
+            a += f'                  <button type="submit" class="btn btn-success">Выйти</button>'
+        a += '''              </form>
+              </div>
+        '''
+        return nav(-1, a)
+    elif request.method == 'POST':
+        return redirect("/musor.net/logout")
+
+
+@app.route('/musor.net/login', methods=['POST', 'GET'])
+def form1():
+    global current
+    if current_user.is_authenticated:
+        return portfolio(current_user.email)
+    if request.method == 'GET':
+        a = '''         <h1>Вход</h1>
+          <div>
+              <form class="login_form" method="post">
+                  <input type="email" autocomplete="on" class="form-control" id="email" aria-describedby="emailHelp" placeholder="Введите адрес почты" name="email">
+                  <input type="password" autocomplete="on" class="form-control" id="password" placeholder="Введите пароль" name="password">
+                  <button type="submit" class="btn btn-success">Войти</button>
+                  <p>или</p>
+                  <a href="/musor.net/createaccount"><button type="button" class="btn btn-success">Зарегистрироваться</button></a>
+              </form>
+          </div>
+    '''
+        return nav(-1, a)
+    elif request.method == 'POST':
+        f = open('planetsavers_accounts.json', 'r', encoding="utf8")
+        f1 = f.read()
+        jr = json.loads(f1)
+        f.close()
+        if request.form['email'] not in jr:
+            return wrong("Неправильный email", 'form1')
+        if jr[request.form['email']]['password'] != request.form['password']:
+            return wrong("Неправильный пароль", 'form1')
+        jr[request.form['email']]['visits'] = str(int(jr[request.form['email']]['visits']) + 1)
+        with open('planetsavers_accounts.json', 'w', encoding="utf8") as write_file:
+            json.dump(jr, write_file)
+        user1 = User(request.form['email'], jr[request.form['email']]['name'],
+                     request.form['password'], jr[request.form['email']]['age'],
+                     jr[request.form['email']]['sex'])
+        login_user(user1)
+        return redirect("/musor.net")
+
+
+@app.route('/musor.net/createaccount', methods=['POST', 'GET'])
+def form2():
+    global current
+    if request.method == 'GET':
+        a = '''
+  <h1>Регистрация</h1>
+      <div>
+          <form class="login_form" method="post">
+              <input type="text" class="form-control" id="name" aria-describedby="emailHelp" placeholder="Введите ваше имя" name="name">
+              <input type="email" class="form-control" id="email" aria-describedby="emailHelp" placeholder="Введите email" name="email">
+              <input type="password" class="form-control" id="password" placeholder="Введите пароль" name="password">
+              <label for="form-check">Укажите свою дату рождения</label>
+              <input type="date" class="form-control" id='age' name='age'>
+              <div class="form-group">
+                  <label for="form-check">Укажите пол</label>
+                  <div class="form-check">
+                    <input class="form-check-input" type="radio" name="sex" id="male" value="Мужской" checked>
+                    <label class="form-check-label" for="Мужской">
+                      Мужской
+                    </label>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input" type="radio" name="sex" id="female" value="Женский">
+                    <label class="form-check-label" for="Женский">
+                      Женский
+                    </label>
+                  </div>
+              </div>
+              <a href="/musor.net/login"><button type="submit" class="btn btn-success">Создать аккаунт</button></a>
+          </form>
+      </div>
+    '''
+        return nav(-1, a)
+    elif request.method == 'POST':
+        f = open('planetsavers_accounts.json', 'r', encoding="utf8")
+        f1 = f.read()
+        jr = json.loads(f1)
+        f.close()
+        if request.form['email'] in jr:
+            return wrong("Такой email уже существует", 'form2')
+        jr[request.form['email']] = {}
+        if request.form['email'] == '' or request.form['password'] == '':
+            return wrong("Не хватает данных!", 'form2')
+        if request.form['name'] == '':
+            jr[request.form['email']]['name'] = 'Аноним'
+        else:
+            jr[request.form['email']]['name'] = request.form['name']
+        jr[request.form['email']]['password'] = request.form['password']
+        jr[request.form['email']]['age'] = request.form['age']
+        jr[request.form['email']]['sex'] = request.form['sex']
+        jr[request.form['email']]['visits'] = '0'
+        jr[request.form['email']]['questions'] = '0'
+        jr[request.form['email']]['answers'] = '0'
+        with open('planetsavers_accounts.json', 'w', encoding="utf8") as write_file:
+            json.dump(jr, write_file)
+        return redirect("/musor.net/login")
+
+
+@app.route('/musor.net/else')
+def index1():
+    global current
+    a = '''        <div class="h-100"></div>
+                <div class="char col-12 row justify-content-center">
+                </div>
+                <div class="h-300"></div>
+                <div class="char col-12 row justify-content-center">
+                    <img src="https://img.huffingtonpost.com/asset/5772ee971500002b006c8abb.jpeg?cache=2aujvjspzu&amp;ops=1778_1000" id="img1">
+                </div>
+                <div class="h-300"></div>
+        </div>
+    '''
+    return nav(1, a)
+
+
+@app.route('/musor.net/chat')
+def chat_function():
+    global current
+    f = open('planetsavers_qs.json', 'r', encoding="utf8")
+    f1 = f.read()
+    qs = json.loads(f1)
+    f.close()
+    a = '''    <div class="row justify-content-center">
+      <div class="char col-12 justify-content-left">'''
+    for i in qs:
+        ans = qs[i]["ans"]
+        ans = ans.split('!*')
+        a += '''
+            <div class="char col-6 justify-content-left">''' + qs[i]['name'] + ': ' + i + '''
+            </div>
+            <div class="char col-6 justify-content-right">'''
+        for j in ans:
+            a += j + '<br>'
+        a += f'''<a href="/musor.net/answer/{i}"><img src="http://pngimg.com/uploads/plus/plus_PNG26.png" id="img0"></a><h4 id="logo">Ответить</h4>
+            </div>'''
+        a += '<img src="https://2.bp.blogspot.com/-6zOg9nVnAfc/WJENdC5R4GI/AAAAAAAAAC0/bw8_Sgac9uI4lBoHKR6o3XG129u5ixAaQCLcB/s400/L%25C3%25ADnea_divisoria_portada.png">'
+    a += '''
+      <div>
+        <a href="/musor.net/answer/ques"><img src="http://pngimg.com/uploads/plus/plus_PNG26.png" id="img0"></a><h4 id="logo">Задать вопрос</h4>
+      </div>
+      </div>
+  </div>'''
+    return nav(2, a)
+
+
+@app.route('/musor.net/answer/<opt>', methods=['POST', 'GET'])
+def question_form(opt):
+    global current
+    if current_user.is_authenticated is False:
+        return wrong('Необходимо войти, чтобы написать комментарий', 'form1')
+    else:
+        if request.method == 'GET':
+            if opt == 'ques':
+                text1 = 'Ваш вопрос'
+            else:
+                text1 = 'Ваш ответ'
+            a = f'''         <h1></h1>
+              <div>
+                  <form class="login_form" method="post">
+                      <label for="about">{text1}</label>
+                      <textarea class="form-control" id="question" rows="1" name="question"></textarea>
+                      <button type="submit" class="btn btn-success">ОК</button>
+                  </form>
+              </div>
+        '''
+            return nav(-1, a)
+        elif request.method == 'POST':
+            f = open('planetsavers_qs.json', 'r', encoding="utf8")
+            f1 = f.read()
+            jr = json.loads(f1)
+            f.close()
+            f2 = open('planetsavers_accounts.json', 'r', encoding="utf8")
+            f3 = f2.read()
+            jr2 = json.loads(f3)
+            f2.close()
+            text1 = request.form['question']
+            if opt == 'ques':
+                jr[text1] = {}
+                jr[text1]["name"] = current_user.name
+                jr[text1]["ans"] = ''
+                jr2[current_user.email]['questions'] = str(int(jr2[current_user.email]['questions']) + 1)
+            else:
+                try:
+                    w = jr[opt]["ans"].split('!*')
+                    w.append(current_user.name + ':' + ' ' + text1)
+                    jr[opt]["ans"] = '!*'.join(w)
+                    jr2[current_user.email]['answers'] = str(int(jr2[current_user.email]['answers']) + 1)
+                except KeyError:
+                    for i in jr:
+                        if opt in i:
+                            opt = i
+                            w = jr[opt]["ans"].split('!*')
+                            w.append(current_user.name + ':' + ' ' + text1)
+                            jr[opt]["ans"] = '!*'.join(w)
+                            jr2[current_user.email]['answers'] = str(int(jr2[current_user.email]['answers']) + 1)
+
+            with open('planetsavers_qs.json', 'w', encoding="utf8") as write_file:
+                json.dump(jr, write_file)
+            with open('planetsavers_accounts.json', 'w', encoding="utf8") as write_file:
+                json.dump(jr2, write_file)
+            return chat_function()
+
+
+@app.route('/musor.net/why')
+def index4():
+    global current
+    a = '''        <div class="h-100"></div>
+            <div class="char col-12 row">
+                <div class="char col-3 justify-content-center"><img src="https://s10.stc.all.kpcdn.net/share/i/4/1704936/inx960x1020.jpg" class="d-block w-100" alt="..."></div>
+                <div class="char col-9 row justify-content-center">
+                    <ul type="square">
+                      <li><p>Сейчас в России перерабатывается только 4–5 % всего мусора, остальное отправляется на свалки, официальные или стихийные. За один год в России выбрасывается больше 70 млн тонн отходов</p></li>
+                      <li><p>Большие скопления мусора выделяют ядовитые газы. Живущие рядом люди могут ими отравиться</p></li>
+                      <li><p>Скоро мусор покроет большую часть планеты. Представьте себе жизнь в грудах мусора! В Greenpeace считают, что площадь всех мусорных полигонов в стране уже достигла 4 миллионов гектаров. Полигоны рассчитаны на 82 млн т отходов, но более половины их мощности уже загружено</p></li>
+                      <li><p>Вместо выброшенных вещей создаются новые - из невозобновляемых ресурсов. В конечном итоге эти ресурсы закончатся и у нас не будет ни пластика, ни бумаги, ни всех сделанных из этого вещей</p></li>
+                    </ul>
+                    <ul>
+                      <br><p>Причины по мнению <a href="https://owlcation.com/stem/10-Reasons-Why-You-Should-Recycle-Your-Waste">Пола Гудмана</a>:</p>
+                      <li><p>Уменьшает Ущерб Окружающей Среде</p></li>
+                      <li><p>Побуждает людей мыслить глобально</p></li>
+                      <li><p><a href="https://dic.academic.ru/dic.nsf/proverbs/50049/Эффект">"эффект снежного кома"</a></p></li>
+                      <li><p>Это не стоит вам денег</p></li>
+                      <li><p>Уменьшение загрязнения</p></li>
+                      <li><p>Многие ресурсы ограничены</p></li>
+                    </ul>
+                </div>
+            </div>
+
+<div id="carouselExampleInterval" class="carousel slide" data-ride="carousel">
+  <div class="carousel-inner">
+    <div class="carousel-item active" data-interval="2000">
+      <img src="http://i38.ru/images/stories/BIG-PHOTO-UNIVERSAL/Nature/ecology/ecology-9.jpg" class="d-block w-25" alt="...">
+    </div>
+    <div class="carousel-item" data-interval="2000">
+      <img src="https://avatars.mds.yandex.net/get-zen_doc/1677529/pub_5dfe43061e8e3f00b0e55c64_5dfe439443fdc000adb4a65d/scale_1200" class="d-block w-25" alt="...">
+    </div>
+    <div class="carousel-item" data-interval="2000">
+      <img src="https://forpost-sz.ru/sites/default/files/doc/2019/12/12/landfill.png" class="d-block w-25" alt="...">
+    </div>
+  </div>
+  <a class="carousel-control-prev" href="#carouselExampleInterval" role="button" data-slide="prev">
+    <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+    <span class="sr-only">Previous</span>
+  </a>
+  <a class="carousel-control-next" href="#carouselExampleInterval" role="button" data-slide="next">
+    <span class="carousel-control-next-icon" aria-hidden="true"></span>
+    <span class="sr-only">Next</span>
+  </a>
+</div>
+<div></div>
+        </div>
+    '''
+    return nav(3, a)
+
+
+@app.route('/musor.net/plastic')
+def index5():
+    global current
+    a = '''        <div class="h-100"></div>
+                <div class="char col-12 row justify-content-center">
+                    <ul>
+                      <li><p>Чтобы узнать, можно ли тарелку или бутылку использовать для изготовления нового изделия, нужно обратить внимание на маркировку. Если на обратной стороне в треугольнике стоит цифра от 1 до 5, отходы можно переплавить</p></li>
+                      <p>- Подлежат переработке:</p>
+                      <li><p>бутылки из-под минеральной и питьевой воды, молока, соков</p></li>
+                      <li><p>пакеты и сумки для покупок</p></li>
+                      <li><p>емкости для бытовой химии, средств личной и интимной гигиены</p></li>
+                      <li><p>многоразовая посуда, контейнеры для хранения пищевых горячих и холодных продуктов</p></li>
+                      <p>- Не подлежат переработке:</p>
+                      <li><p>клеенка, баннерная ткань</p></li>
+                      <li><p>одноразовая посуда, упаковки для йогуртов, плавленых сыров</p></li>
+                      <li><p>коробки от CD-дисков, видео, аудио кассеты</p></li>
+                      <li><p>бутыли для кулеров и детского питания</p></li>
+                    </ul>
+                </div>
+                <div class="h-300"></div>
+                <div class="char col-12 row justify-content-center">
+                    <img src="https://avatars.mds.yandex.net/get-pdb/2308976/7cf6d220-8ace-4e17-8f7a-6e5c5cee9a30/s1200" id="img1">
+                </div>
+                <div class="h-300"></div>
+        </div>
+    '''
+    return nav(1, a)
+
+
+@app.route('/musor.net/paper')
+def index6():
+    global current
+    a = '''        <div class="h-100"></div>
+                <div class="char col-12 row justify-content-center">
+                    <ul>
+                      <li><p>Стандартный лист бумаги или картона можно перерабатывать до 5 раз</p></li>
+                      <li><p>Бумага для принтера подлежит повторному применению. Это же относится к картонной таре, журналам, газетам</p></li>
+                      <li><p>Чеки переработке не подлежат</p></li>
+                    </ul>
+                </div>
+                <div class="h-300"></div>
+                <div class="char col-12 row justify-content-center">
+                    <img src="https://pixfeeds.com/images/save-nature/1280-121030947-green-paper-recycling-bin.jpg" id="img1">
+                </div>
+                <div class="h-300"></div>
+        </div>
+    '''
+    return nav(1, a)
+
+
+@app.route('/musor.net/metal')
+def index7():
+    global current
+    a = '''        <div class="h-100"></div>
+                <div class="char col-12 row justify-content-center">
+                    <ul>
+                      <li><p>переработке подлежат посуда, контейнеры из алюминия</p></li>
+                      <li><p>переработке подлежат консервные банки и крышки</p></li>
+                      <li><p>переработке подлежит фольга для запекания</p></li>
+                    </ul>
+                </div>
+                <div class="h-300"></div>
+                <div class="char col-12 row justify-content-center">
+                    <img src="http://ruferrum.ru/wp-content/uploads/2019/07/640-114347304-recycling-bin-with-metal-products1.jpg" id="img1">
+                </div>
+                <div class="h-300"></div>
+        </div>
+    '''
+    return nav(1, a)
+
+
+@app.route('/musor.net/mail', methods=['POST', 'GET'])
+def mail():
+    global current
+    if request.method == 'GET':
+        a = '''        <div class="container-fluid"> 
+            <div class="row">
+              <div class="h-100"></div>
+                <div class="char col-12 row justify-content-center">
+                    <p id="p1">Пожалуйста заполните эти поля!</p>
+                </div>
+                <div class="char col-12 row justify-content-center">
+
+<form action="/static/posting_mail.php" method="post">
+Ваше имя: <input type="text" name="first_name"><br>
+Email: <input type="text" name="email" required placeholder=""><br>
+Сообщение: <br><textarea rows="5" name="message" cols="30"></textarea><br>
+<input type="submit" name="submit" value="отправить">
+</form>
+
+                </div>
+            </div>   
+        </div>
+    '''
+        return nav(-1, a)
+    elif request.method == 'POST':
+        return '''<!doctype html>
+    <head>
+    <script src="http://yandex.st/jquery/1.9.1/jquery.js"></script>
+    <script>
+    function send_form() { 
+    var msg = $("#forma").serialize();
+    $.ajax({
+    type: "POST",
+    url: "send.php",
+    data: msg,
+    success: function(data) {
+    alert("Отправлено");
+    setTimeout(function () {
+    $(".feedback_form_bg").fadeOut();}, 1000);
+    },
+    error:  function(xhr, str){
+    alert("error!");
+    setTimeout(function () {$(".feedback_form_bg").fadeOut();}, 1000);
+    }
+    });
+    }
+    </script>
+     
+    </head>
+    <body>
+    
+     
+    <form method="post" action="javascript:void(0);" onsubmit="send_form();" id="forma">
+    <input type="text" name="fio" placeholder="Имя" />
+    <input type="text" name="phone" placeholder="Телефон" />
+    <input type="text" name="email" placeholder="E-Mail" />
+    <input type="text" name="adres" placeholder="Адрес доставки" />
+    <br/>
+    <input type="submit" value="отправить" />
+    </form> 
+     
+    </body>
+    </html>
+        '''
+
+
+if __name__ == '__main__':
+    app.run()
